@@ -6,6 +6,7 @@ import classnames from 'classnames';
 import Logger from '../Logger';
 import utils from '../utils';
 import UserChip from './UserChip';
+import MediaToggles from './MediaToggles';
 
 const logger = new Logger('Dialer');
 
@@ -53,6 +54,14 @@ export default class Dialer extends React.Component
 						/>
 					</div>
 
+					<div className='media-container'>
+						<MediaToggles
+							media={props.media}
+							disabled={props.busy}
+							onChange={this.handleMediaChange.bind(this)}
+						/>
+					</div>
+
 					<RaisedButton
 						label='Call'
 						primary
@@ -67,6 +76,13 @@ export default class Dialer extends React.Component
 	handleUriChange(event)
 	{
 		this.setState({ uri: event.target.value });
+	}
+
+	handleMediaChange(changed)
+	{
+		logger.debug('handleMediaChange() [changed:%o]', changed);
+
+		this.props.onMediaChange(changed);
 	}
 
 	handleSubmit(event)
@@ -111,9 +127,11 @@ export default class Dialer extends React.Component
 
 Dialer.propTypes =
 {
-	settings : PropTypes.object.isRequired,
-	status   : PropTypes.string.isRequired,
-	busy     : PropTypes.bool.isRequired,
-	callme   : PropTypes.string,
-	onCall   : PropTypes.func.isRequired
+	settings      : PropTypes.object.isRequired,
+	media         : PropTypes.object.isRequired,
+	status        : PropTypes.string.isRequired,
+	busy          : PropTypes.bool.isRequired,
+	callme        : PropTypes.string,
+	onCall        : PropTypes.func.isRequired,
+	onMediaChange : PropTypes.func.isRequired
 };

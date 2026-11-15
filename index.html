@@ -6,6 +6,7 @@
 		<meta charset='UTF-8'>
 		<meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no'>
 
+		<link rel='icon' type='image/svg+xml' href='resources/images/favicon.svg'>
 		<link rel='stylesheet' href='tryit-jssip.css'>
 
 		<script src='resources/js/antiglobal.js'></script>
@@ -14,13 +15,49 @@
 			window.localStorage.setItem('debug', '* -engine* -socket* *ERROR* *WARN*');
 
 			// Set antiglobal
-			window.antiglobal('___browserSync___oldSocketIo', 'JSON3', 'io', '___browserSync___', '__core-js_shared__', 'MediaStream', 'RTCPeerConnection', 'callstats', 'jssipCallstats');
+			window.antiglobal(
+				'___browserSync___oldSocketIo', 'JSON3', 'io', '___browserSync___',
+				'__core-js_shared__', 'MediaStream', 'RTCPeerConnection',
+				'callstats', 'jssipCallstats',
+				'callLogger', 'jssip', 'UA', 'SESSION');
 			setInterval(window.antiglobal, 5000);
 		</script>
-		<script src='https://api.callstats.io/static/callstats.min.js'></script>
-		<script src='https://api.callstats.io/static/callstats-jssip.min.js'></script>
+		<!-- callstats.io закрыт, скрипты не грузим -->
 
 		<script>
+			// TURN/STUN подставляются при сборке из .env (если настроек
+			// ещё нет). В настройках это можно заменить на своё.
+			if (!window.localStorage.getItem('settings'))
+			{
+				window.SETTINGS =
+				{
+					socket :
+					{
+						uri           : 'wss://tryit.jssip.net:10443',
+						via_transport : 'auto'
+					},
+					'registrar_server'    : null,
+					'contact_uri'         : null,
+					'authorization_user'  : null,
+					'instance_id'         : null,
+					'session_timers'      : true,
+					'use_preloaded_route' : false,
+					pcConfig :
+					{
+						iceServers :
+						[
+							{
+								// Заполняется при сборке: TURN_URL / TURN_USER / TURN_PASS
+								urls       : [ '__TURN_URL_UDP__', '__TURN_URL_TCP__' ],
+								username   : '__TURN_USER__',
+								credential : '__TURN_PASS__'
+							},
+							{ urls: [ '__TURN_STUN__' ] }
+						]
+					}
+				};
+			}
+
 			// Uncomment and fill the SETTINGS object in order to use hardcoded settings
 			//
 			// You don't need to set display_name nor uri, they can be set via HTTP form in

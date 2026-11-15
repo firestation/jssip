@@ -1,44 +1,270 @@
-# tryit-jssip
+# tryit-jssip — демо SIP-клиента на JsSIP
 
-The [JsSIP](http://jssip.net) demo application.
+Веб-софтфон на [JsSIP](http://jssip.net): звонки из браузера по SIP через WebSocket,
+без установки чего-либо на компьютер. Это форк демо
+[tryit.jssip.net](https://tryit.jssip.net) с настраиваемыми ICE/STUN, управлением
+видео, живой статистикой качества и журналом звонка.
 
-Check it online at https://tryit.jssip.net
+Оригинальное демо — <https://tryit.jssip.net>.
 
 
-## Installation
+## Установка (кратко)
 
-* Fork the project.
-
-* Install dependencies:
-
-```bash
-$ npm install
-```
-
-* Globally install the NPM `gulp-cli` package:
+Нужны Node.js 18+ и любой веб-сервер; для звонков — **HTTPS** (браузер не отдаёт
+микрофон на `http://`, кроме `localhost`).
 
 ```bash
-$ npm install -g gulp-cli
+git clone git@github.com:firestation/jssip.git
+cd jssip
+cp .env.example .env          # TURN/STUN, логин и пароль сайта
+npm install
+npx gulp prod                 # соберётся в out/
 ```
 
-* Build the app (check the [gulpfile](./gulpfile.js) file for details):
-  * `gulp prod` generates the app in production/minified mode.
-  * `gulp dev` generates the app in development mode.
-  * `gulp live` generates the app in development mode, opens the local website and watches for changes in the source code.
+`out/` — обычная статика, её раздаёт любой веб-сервер. Выкладка одной командой:
 
-* Once built, the `out/` directory is created with all the HTML, CSS and JavaScript files to be deployed in your own server.
+```bash
+HOST=ваш.домен KEY=~/.ssh/id_ed25519 APP_DIR=/var/www/jssip ./deploy/deploy.sh
+```
+
+Все пути внутри приложения относительные, поэтому `out/` работает и в корне
+домена, и в подкаталоге. iOS/Android — через `getUserMedia`, клиент на телефоне
+не нужен.
+
+Полная инструкция — [DEPLOY.md](./DEPLOY.md): сборка, `.env`, TURN/STUN (coturn),
+выкладка, обновление и откат. Настройки веб-сервера и способы ограничить доступ
+сюда не входят — это инфраструктура конкретной установки.
+
+Рекомендуемая версия JsSIP — **3.13.x** (в `package.json` стоит `^3.13.9`, версия
+не закреплена). TURN/STUN и пароли **не хранятся в репозитории** — только в `.env`,
+который в `.gitignore`.
+
+
+## Features
+
+Что добавлено в интерфейс поверх оригинального tryit-jssip.
+
+### Features: настройки ICE / STUN
+
+- `ICE transport policy` — `all` (host + srflx + relay) или `relay` (только TURN).
+- `RTCP mux policy` — `negotiate` / `require`.
+- `ICE servers` — многострочный список STUN/TURN; запятые тоже принимаются, пустой
+  список = работать без ICE-серверов.
+- `ICE username` / `ICE credential` — общая пара для TURN; подставляется только в
+  `turn:` / `turns:` записи.
+- `Test ICE` — реальная проверка STUN/TURN: собирает кандидатов и показывает
+  публичный адрес (srflx) или TURN-relay, либо сообщает, что STUN не ответил.
+- `Завершать сбор ICE по srflx` — переключатель: завершать ожидание, как только
+  получен публичный адрес, не дожидаясь полной сборки.
+- `Таймаут сбора ICE, мс` — общий лимит времени на сбор кандидатов (по умолчанию
+  4000); по истечении сбор завершается, звонок продолжается.
+
+### Features: настройки медиа
+
+- Переключатели `Audio` / `Video` — вкл/выкл звук и видео для звонка.
+- Выбор `Microphone` — конкретное устройство или `System default`.
+- Выбор `Camera` — конкретное устройство или `System default`.
+- `Local media preview` — проверка камеры и микрофона до начала звонка.
+
+### Features: экран дозвона
+
+- Быстрые переключатели `Audio` / `Video` рядом с кнопкой `Call`.
+- Выбранное состояние сохраняется и применяется к следующему звонку.
+
+### Features: управление во время звонка
+
+- Кнопка выключения микрофона — отдельной кнопкой выше «сбросить» и «пауза»;
+  при выключении становится красной с иконкой `mic off`.
+- Включение микрофона обратно — там же, без пересогласования SDP.
+
+### Features: онлайн-статистика звонка
+
+Окно «Качество звонка» в правом нижнем углу, обновляется каждые 6 секунд:
+
+- онлайн-уровень сигнала с микрофона (пиковый за окно 3 с);
+- онлайн-статистика поступивших RTP-пакетов (за интервал);
+- онлайн-статистика отправленных RTP-пакетов (за интервал);
+- счётчик потерь RTP-пакетов (прирост за интервал);
+- текущий jitter входящего потока;
+- текущий RTT по выбранной ICE-паре, мс;
+- список активных проблем — красным; запись **исчезает сама**, когда метрика
+  возвращается в норму;
+- кнопка `Очистить` — сброс показателей и проблем;
+- крестик — скрыть окно.
+
+### Features: уведомления о качестве
+
+- «Нет сигнала с микрофона, проверьте устройства» — нет дорожки или уровень ниже порога.
+- «Нет публичного адреса» — за таймаут сбора не получен srflx.
+- «Нет входящего аудио, возможны проблемы в сети» — пакеты не приходят.
+- «Нет исходящего аудио, проверьте микрофон» — пакеты не уходят.
+- «Потери пакетов», «Высокий jitter», «Высокий RTT» — с порогами.
+
+### Features: журнал звонка
+
+- Кнопка скачивания журнала в верхней панели — сохраняет `sip-log-*.txt`
+  и копирует в буфер; на десктопе то же по `Alt+L`.
+- В журнале: старт звонка, ICE-кандидаты и состояния, отправка INVITE и таймеры,
+  дорожки, RTP-статистика, замеры микрофона, проблемы качества.
+- Журнал начинается заново при каждой загрузке страницы (без старых записей).
+
+### Features: сессии вкладок
+
+- Каждая вкладка — отдельная сессия: свои настройки, свой SIP-клиент.
+- Разные `instance_id` на сервере (UUID вкладки); изменения в одной вкладке
+  не затрагивают другую.
+- Новая вкладка стартует с последних сохранённых настроек.
+
+### Что не менялось
+
+Экран логина, дозвон, экран звонка, кнопки сброса и удержания, `Exit`,
+копирование ссылки и URI — как в апстриме tryit-jssip.
+
+
+## Проверка
+
+```bash
+npx gulp lint      # в исходном upstream два замечания — это норма
+npx gulp prod      # сборка без ошибок
+```
+
+Логи звонка: кнопка ⬇ в верхней панели (`Alt+L` на десктопе) — журнал
+с метками `call_start`, `ice_*`, `invite_tx`, `tracks`, `media`,
+`quality`, `mic_check`.
+
+
+---
+
+# Журнал проблем и решений
+
+Легенда: ✅ — решено и проверено · ⚠️ — обойдено · ❌ — не решено
+
+## Сводная таблица
+
+| # | Проблема | Статус | Как решено |
+|---|---|---|---|
+| 1 | Пауза ~40 с перед отправкой INVITE | ✅ | `ready()` по первому `srflx` |
+| 2 | `Timer B expired`, звонок рвётся через 32 с | ✅ | следствие #1 (INVITE не уходил) |
+| 3 | `Bad Media Description` (488) | ✅ | убраны наслоения раннего отпуска + `mediaStream` |
+| 4 | Тишина на iPhone (Safari/Яндекс) | ✅ | микрофон берём сами по жесту, `playsInline`, `track` |
+| 5 | Серый экран при входящем | ✅ | удалён несуществующий обработчик + z-index панели |
+| 6 | `undefined.bind` крашит экран | ✅ | восстановлены обработчики; добавлен страж `verify-bind` |
+| 7 | `unknown level "warning"` | ✅ | `Notifier` знает только `info`/`success`/`error` |
+| 8 | Настройки одинаковые во всех вкладках | ✅ | `sessionStorage` на вкладку + UUID в `instance_id` |
+| 9 | Шрифты 404, логотип без шрифта | ✅ | пути в CSS сделаны относительными |
+| 10 | callstats.io мёртв (2 запроса 404) | ✅ | скрипты убраны из `index.html` |
+| 14 | Прокси `wpad/Ai_DS` в Chrome | ⚠️ | не влияет на загрузку, но шумит в консоли |
+| 15 | `no CRLF found, not a SIP message` | ⚠️ | SBC шлёт WS-фреймы без CRLF; на звонки не влияет |
+| 16 | На iPhone не работает «только локальные» | ⚠️ | поднят собственный TURN (coturn) |
+| 17 | Потеря UDP к `stun.l.google.com` | ⚠️ | заменён на рабочий STUN/TURN |
+| 18 | Ошибка ICE завершала звонок | ✅ | таймаут только завершает сбор, звонок идёт |
+| 19 | При отсутствии микрофона крутился ICE | ✅ | гасим страж по `getusermediafailed`/`failed`/`ended` |
+| 20 | Панель качества пустая | ⚠️ | в работе (требуется журнал с входящего) |
+| 21 | Проблемы качества не исчезали | ✅ | `active: true/false`, снимаются при норме |
+| 22 | Таймаут сбора ICE не настраивался | ✅ | вынесен в настройки (галочка + мс) |
+| 26 | Звонок молча падает с `Canceled` через 20 мс после INVITE | ✅ | при закрытом WebSocket — явный отказ `call_blocked` |
+| 23 | Нет звука на iPhone при `answer()` | ✅ | `getUserMedia` по нажатию |
+| 24 | Двойной `sdp_ready` на одном звонке | ⚠️ | признак раннего отпуска; убран |
+| 25 | `antiglobal` ругался на `callLogger` | ✅ | добавлен в разрешённые |
+
+---
+
+## Проблема → решение (кратко)
+
+### ICE и установление звонка
+
+**Пауза ~40 секунд перед INVITE**
+`iceGatheringState` не переходит в `complete`, хотя все кандидаты собраны за
+~100 мс: Chrome держит сбор открытым из-за STUN-транзакций.
+*Решение:* `session.on('icecandidate', ({candidate, ready}) => { if (candidate.type === 'srflx') ready(); })`
+— официальный API JsSIP (`IceCandidateEvent.ready`), звонок стартует за ~1 с.
+
+**Timer B (32 с) и обрыв**
+Приглашение не уходило, потому что ждало полной сборки ICE, а `Timer B`
+тикает **после** отправки. Ложный след: казалось, что виноват ICE.
+*Решение:* то же `ready()` по `srflx` — INVITE уходит сразу, таймер не истекает.
+
+**Bad Media Description (488)**
+Появлялось при наслоении раннего отпуска + своего `mediaStream`. На чистой
+базе с одним `ready()` не воспроизводится.
+*Решение:* убрать все ручные отпуски и `mediaStream`, оставить один механизм.
+
+**Не настраивался таймаут ICE**
+*Решение:* в настройках два параметра — галочка «Завершать сбор ICE по srflx»
+и «Таймаут сбора ICE, мс». Таймаут **завершает только сбор**, звонок не рвёт.
+
+**Звонок молча завершается с `Canceled` через ~20 мс после INVITE**
+WebSocket к АТС уже был закрыт (пропала сеть, SBC разорвал соединение), но UI
+показывал статус `registered`/`connected`. JsSIP собирает SDP, пытается отправить
+INVITE, `WebSocketInterface.send()` видит неоткрытый сокет, `onTransportDisconnect`
+дёргает `terminate()` — и звонок гаснет с причиной `Canceled`. В журнале это
+выглядит как «звонок не отправляется» без причины.
+*Решение:* `handleOutgoingCall()` проверяет `_ua.isConnected()` и вместо звонка
+показывает «Нет связи с сервером», пишет в журнал `call_blocked`; у `failed`
+с `Canceled` при закрытом транспорте появился маркер `hint: transport_closed`.
+
+**ICE крутился при отсутствии микрофона**
+`getUserMedia` падал, сессия завершалась, а таймер сбора продолжал идти.
+*Решение:* `_watchMediaFailure()` гасит страж по `getusermediafailed`/`failed`/`ended`.
+
+### iOS / WebKit
+
+**Тишина на iPhone**
+JsSIP берёт микрофон внутри `answer()`, iOS отдавал дорожку `live`, но с
+уровнем `0` (конфликт `AVAudioSession`).
+*Решение:* брать поток **самим по нажатию** и передавать `answer({ mediaStream })`;
+в Safari также нужны `playsInline`, событие `track` и `typeof getRemoteStreams`.
+
+**Проверка уровня**
+`AnalyserNode` на дорожке, окно 3 с; при `level < 0.01` — сообщение
+«Нет сигнала с микрофона, проверьте устройства».
+
+### Приложение и UI
+
+**`undefined.bind` роняет экран**
+При правках вырезались методы, на которые ссылалась разметка.
+*Решение:* после правок сверять **все** `this.X.bind(this)` по компонентам:
+у каждого должен быть метод с таким именем.
+
+**`unknown level "warning"`**
+`Notifier` в tryit принимает только `info`/`success`/`error` и бросает ошибку.
+*Решение:* свои уведомления — только на `info`/`error`.
+
+**Серый экран при входящем**
+*Решение:* восстановлен обработчик; панель качества — `position: fixed; z-index: 2000`.
+
+**Настройки одинаковые во вкладках**
+`localStorage` общий на origin.
+*Решение:* `sessionStorage` на вкладку + UUID в `instance_id` (`lib/storage.js`).
+
+**Проблемы качества не исчезали**
+*Решение:* `raise()`/`clear()` — запись `quality_problem { active: true|false }`,
+панель собирает активные по `key`.
+
+### Инфраструктура
+
+**Шрифты 404**
+Абсолютные пути `/resources/...` не работают под префиксом `/jssip/`.
+*Решение:* относительные пути в `stylus/fonts.styl` и `Login.styl`.
+
+**curl показывал 200, а браузер 304**
+*Решение:* `add_header Cache-Control "no-store"` для `index.html`.
+
+**TURN для мобильных сетей**
+*Решение:* собственный coturn: статические креды, диапазон портов релея 49152–65535.
 
 
 ## Hardcoded settings
 
-The app allows entering settings via an HTTP form in the Login section. However, the developer can hardcode some specific settings (for example the _callstats.io_  settings) by defining a `window.SETTINGS` variable before the `tryit-jssip.js` is loaded.
+Настройки вводятся через форму в разделе Login, но разработчик может зашить часть
+из них, определив переменную `window.SETTINGS` до загрузки `tryit-jssip.js`.
+Пример — в [index.html](./index.html); там же плейсхолдеры `__TURN_*__`,
+которые подставляет сборка из `.env`.
 
-Check the commented code in the [index.html](./index.html) and fill it as needed.
 
-
-## Notes
-
-* If you run this web application into your own domain, you will also need to set your own SIP/WebSocket servers. The SIP servers running at the public demo won't accept connections origins other than `https://tryit.jssip.net`.
+* Если вы запускаете приложение на своём домене, нужны свои SIP/WebSocket-серверы.
+Публичные SIP-серверы демо не принимают соединения с других origin, кроме
+`https://tryit.jssip.net`.
 
 
 ## Author

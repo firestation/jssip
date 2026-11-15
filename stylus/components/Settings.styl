@@ -27,6 +27,48 @@
 
 	.item {
 		margin: 0 16px;
+
+		.help {
+			margin: 4px 0 10px 0;
+			font-size: 12px;
+			color: #888;
+		}
+
+		.buttons-row {
+			display: flex;
+			flex-direction: row;
+			align-items: center;
+			flex-wrap: wrap;
+			margin-top: 10px;
+
+			.ice-result {
+				margin-left: 16px;
+				font-size: 13px;
+				color: #666;
+
+				&.success {
+					color: #2e7d32;
+				}
+
+				&.error {
+					color: #c62828;
+				}
+
+				&.pending {
+					color: #ef6c00;
+				}
+			}
+		}
+
+		.local-preview {
+			display: block;
+			width: 100%;
+			max-width: 320px;
+			max-height: 240px;
+			margin-top: 10px;
+			background-color: #000;
+			border-radius: 4px;
+		}
 	}
 
 	.separator {

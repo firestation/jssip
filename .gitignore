@@ -2,3 +2,9 @@
 /out
 /resources/js/callstats.*
 .DS_Store
+.env
+.env.local
+certs/
+run/
+# Локальные проверочные/диагностические скрипты — не часть приложения
+/tools/

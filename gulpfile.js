@@ -41,6 +41,7 @@ const stylus = require('gulp-stylus');
 const autoprefixer = require('autoprefixer-stylus');
 const cssBase64 = require('gulp-css-base64');
 const browserSync = require('browser-sync');
+const through2 = require('through2');
 
 const PKG = require('./package.json');
 const BANNER = fs.readFileSync('banner.txt').toString();
@@ -166,9 +167,68 @@ gulp.task('css', () =>
 		.pipe(touch());
 });
 
+// TURN/STUN подставляются в index.html из окружения (или из .env),
+// чтобы адреса и пароли не лежали в репозитории.
+function turnSettings()
+{
+	const env = {};
+
+	try
+	{
+		const path2 = path.join(__dirname, '.env');
+
+		if (fs.existsSync(path2))
+		{
+			for (const line of fs.readFileSync(path2, 'utf8').split('\n'))
+			{
+				const match = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
+
+				if (match && !env[match[1]])
+					env[match[1]] = match[2];
+			}
+		}
+	}
+	catch (error) {}
+
+	const get = (key) => process.env[key] || env[key] || '';
+
+	return {
+		TURN_URL_UDP : get('TURN_URL_UDP'),
+		TURN_URL_TCP : get('TURN_URL_TCP'),
+		TURN_STUN    : get('TURN_STUN'),
+		TURN_USER    : get('TURN_USER'),
+		TURN_PASS    : get('TURN_PASS')
+	};
+}
+
 gulp.task('html', () =>
 {
+	const values = turnSettings();
+	const replace = () =>
+	{
+		const stream = through2.obj((file, enc, cb) =>
+		{
+			if (file.isBuffer())
+			{
+				let html = file.contents.toString();
+
+				for (const key of Object.keys(values))
+					html = html.split(`__${key}__`).join(values[key]);
+
+				// Пустые значения выглядят некрасиво — убираем пустые записи
+				html = html.replace(/\{\s*urls:\s*\[\s*''\s*\]\s*\},?/g, '');
+
+				file.contents = Buffer.from(html);
+			}
+
+			cb(null, file);
+		});
+
+		return stream;
+	};
+
 	return gulp.src('index.html')
+		.pipe(replace())
 		.pipe(gulp.dest(OUTPUT_DIR));
 });
 

@@ -3,9 +3,12 @@ import PropTypes from 'prop-types';
 import HangUpIcon from 'material-ui/svg-icons/communication/call-end';
 import PauseIcon from 'material-ui/svg-icons/av/pause-circle-outline';
 import ResumeIcon from 'material-ui/svg-icons/av/play-circle-outline';
+import MicIcon from 'material-ui/svg-icons/av/mic';
+import MicOffIcon from 'material-ui/svg-icons/av/mic-off';
 import classnames from 'classnames';
 import JsSIP from 'jssip';
 import Logger from '../Logger';
+import callLogger from '../callLogger';
 import TransitionAppear from './TransitionAppear';
 
 const logger = new Logger('Session');
@@ -23,7 +26,8 @@ export default class Session extends React.Component
 			localHold      : false,
 			remoteHold     : false,
 			canHold        : false,
-			ringing        : false
+			ringing        : false,
+			micMuted       : false
 		};
 
 		// Mounted flag
@@ -75,6 +79,21 @@ export default class Session extends React.Component
 
 					<div className='controls-container'>
 						<div className='controls'>
+							{/* Выключение микрофона — отдельной кнопкой выше сброса/паузы */}
+							<div
+								className={classnames('control mic-toggle',
+									{ muted: state.micMuted })}
+								title={state.micMuted ? 'Включить микрофон' : 'Выключить микрофон'}
+								onClick={this.handleToggleMic.bind(this)}
+							>
+								<If condition={state.micMuted}>
+									<MicOffIcon color='#ff5252'/>
+								</If>
+								<If condition={!state.micMuted}>
+									<MicIcon color='#fff'/>
+								</If>
+							</div>
+
 							<HangUpIcon
 								className='control'
 								color={'#fff'}
@@ -289,6 +308,27 @@ export default class Session extends React.Component
 		logger.debug('handleHangUp()');
 
 		this.props.session.terminate();
+	}
+
+	// Включение/выключение микрофона: track.enabled — без пересогласования SDP
+	handleToggleMic()
+	{
+		const session = this.props.session;
+		const pc = session && session.connection;
+		const senders = pc && pc.getSenders ? pc.getSenders() : [];
+		const audio = senders.find((item) => item.track && item.track.kind === 'audio');
+
+		if (!audio || !audio.track)
+			return;
+
+		const enabled = !audio.track.enabled;
+
+		audio.track.enabled = enabled;
+
+		logger.debug('handleToggleMic() [enabled:%s]', enabled);
+
+		callLogger.log('mic_toggle', { enabled });
+		this.setState({ micMuted: !enabled });
 	}
 
 	handleHold()

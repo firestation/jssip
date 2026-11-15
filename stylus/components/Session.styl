@@ -112,6 +112,27 @@
 					pointer-events: none;
 					opacity: 0.25;
 				}
+
+				// Кнопка выключения микрофона: стоит выше остальных
+				&.mic-toggle {
+					position: absolute;
+					left: 50%;
+					transform: translateX(-50%);
+					bottom: 100%;
+					margin: 0 0 14px 0;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					background-color: rgba(#000, 0.5);
+					border-radius: 50%;
+					padding: 8px;
+					opacity: 0.85;
+
+					&.muted {
+						background-color: rgba(#b71c1c, 0.85);
+						opacity: 1;
+					}
+				}
 			}
 		}
 	}
